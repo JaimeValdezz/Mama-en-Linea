@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio</title>
+    <!-- Cargar todos los estilos en cabecera -->
+     <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        .imagen {
+            border-radius: 50%;
+            height: 200px;
+            width: 400px;
+        }
+        .parrafo {
+            color: white;
+            font-size: 30px;
+
+        }
+        #section1 {
+            background-color: black;
+
+        }
+        #section2 {
+            background-color: black;
+            text-align: center;
+
+        }
+        .section {
+            margin: 20px;  
+            padding: 30px;
+
+        }
+        .title {
+            color: red;
+            font-size: 45px;
+            text-align: center;
+        }
+     </style>
+</head>
+<body>
+    <h1 class="title">Garage Casas</h1>
+    <section id="section1" class="section">
+        <center>
+            <img class="imagen" src="hennessey-chevrolet-camaro-zl1-exorcist-final-edition.webp" alt="Camaro zl1 negro">
+        </center>
+        <center>
+            <img class="imagen" src="Challenger.jpg" alt="Challenger hellcat">
+        </center>
+        
+
+    </section>
+    <section id="section2" class="section">
+        <p class="parrafo">
+            Gerardo Casas Franco
+
+        </p>
+    </section>
+    <!--Cargar todos los scrips antes de cerrar body  -->
+</body>
+</html>
