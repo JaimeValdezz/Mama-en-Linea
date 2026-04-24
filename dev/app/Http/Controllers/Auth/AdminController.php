@@ -35,7 +35,7 @@ class AdminController extends Controller
     public function toggle($id)
     {
         try {
-            $database = Firebase::firestore()->database();
+            $database = Firebase::firestore()->database(['transport' => 'rest']);
             $docRef = $database->collection('Vacantes')->document($id);
             $snapshot = $docRef->snapshot();
 

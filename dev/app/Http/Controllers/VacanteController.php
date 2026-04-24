@@ -54,7 +54,7 @@ class VacanteController extends Controller
     */
 
     try {
-        $database = Firebase::firestore()->database();
+        $database = Firebase::firestore()->database(['transport' => 'rest']);
         
         // Guardamos los datos que vienen del formulario
         $database->collection('Vacantes')->add([

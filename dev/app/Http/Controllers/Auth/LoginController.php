@@ -40,7 +40,7 @@ class LoginController extends Controller
             $userRecord = $auth->getUserByPhoneNumber($firebasePhone);
 
             // 3. Obtener datos de perfil en Firestore
-            $database = Firebase::firestore()->database();
+            $database = Firebase::firestore()->database(['transport' => 'rest']);
             $userDoc = $database->collection('Usuarios')->document($userRecord->uid)->snapshot();
 
             if ($userDoc->exists()) {

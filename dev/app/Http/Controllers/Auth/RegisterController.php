@@ -47,7 +47,7 @@ class RegisterController extends Controller
             $uid = $userRecord->uid;
 
             // 2. GUARDAR EN FIRESTORE
-            $database = Firebase::firestore()->database();
+            $database = Firebase::firestore()->database(['transport' => 'rest']);
             $rolAsignado = $request->rol;
 
             $database->collection('Usuarios')
