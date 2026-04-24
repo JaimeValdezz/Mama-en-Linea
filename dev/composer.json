@@ -5,7 +5,7 @@
         "php": "^8.2",
         "google/cloud-firestore": "^1.55",
         "guzzlehttp/guzzle": "^7.9",
-        "kreait/laravel-firebase": "5.26.0",
+        "kreait/laravel-firebase": "^5.0",
         "laravel/framework": "^11.51",
         "laravel/tinker": "^2.9",
         "laravel/ui": "^4.5"
