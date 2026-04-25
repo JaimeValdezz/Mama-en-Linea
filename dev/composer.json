@@ -1,6 +1,6 @@
 {
     "require": {
         "laravel/ui": "3.4",
-        "kreait/laravel-firebase": "^5.26.0"
+        "kreait/laravel-firebase": "^5.0"
     }
 }
