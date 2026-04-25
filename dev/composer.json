@@ -1,36 +1,6 @@
 {
-    "name": "laravel/laravel",
-    "type": "project",
     "require": {
-        "php": "^8.2",
-        "google/cloud-firestore": "^1.55",
-        "guzzlehttp/guzzle": "^7.9",
-        "kreait/laravel-firebase": "^5.10",
-        "laravel/framework": "^11.51",
-        "laravel/tinker": "^2.9",
-        "laravel/ui": "^4.5"
-    },
-    "autoload": {
-        "psr-4": {
-            "App\\": "app/"
-        }
-    },
-    "provide": {
-        "ext-grpc": "1.0.0"
-    },
-    "config": {
-        "optimize-autoloader": true,
-        "preferred-install": "dist",
-        "sort-packages": true,
-        "platform-check": false,
-        "platform": {
-            "php": "8.3.30"
-        },
-        "allow-plugins": {
-            "pestphp/pest-plugin": true,
-            "php-http/discovery": true
-        }
-    },
-    "minimum-stability": "stable",
-    "prefer-stable": true
+        "laravel/ui": "3.4",
+        "kreait/laravel-firebase": "^5.26.0"
+    }
 }
