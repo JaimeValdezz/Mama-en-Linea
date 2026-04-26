@@ -1,8 +1,0 @@
-{
-  "dependencies": {
-    "firebase": "^12.9.0"
-  },
-  "devDependencies": {
-    "cypress": "^15.11.0"
-  }
-}
