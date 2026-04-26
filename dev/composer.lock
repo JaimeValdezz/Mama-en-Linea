@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bf27d13f21e510468a12a07ec7599a45",
+    "content-hash": "8379dea03cc58729c0b785c25e075b11",
     "packages": [
         {
             "name": "beste/clock",
@@ -1991,16 +1991,16 @@
         },
         {
             "name": "kreait/firebase-php",
-            "version": "8.2.0",
+            "version": "7.24.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/beste/firebase-php.git",
-                "reference": "7a1007c8151e1bf7be9f6b0f9a1e37b1f734f59e"
+                "reference": "935292e2af33af0120654ce704f1dc8f1c03025b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/beste/firebase-php/zipball/7a1007c8151e1bf7be9f6b0f9a1e37b1f734f59e",
-                "reference": "7a1007c8151e1bf7be9f6b0f9a1e37b1f734f59e",
+                "url": "https://api.github.com/repos/beste/firebase-php/zipball/935292e2af33af0120654ce704f1dc8f1c03025b",
+                "reference": "935292e2af33af0120654ce704f1dc8f1c03025b",
                 "shasum": ""
             },
             "require": {
@@ -2022,18 +2022,27 @@
                 "kreait/firebase-tokens": "^5.2",
                 "lcobucci/jwt": "^5.3",
                 "mtdowling/jmespath.php": "^2.8.0",
-                "php": "~8.3.0 || ~8.4.0 || ~8.5.0",
+                "php": "~8.1.0 || ~8.2.0 || ~8.3.0 || ~8.4.0 || ~8.5.0",
                 "psr/cache": "^2.0 || ^3.0",
                 "psr/clock": "^1.0",
                 "psr/http-client": "^1.0.3",
                 "psr/http-factory": "^1.1",
-                "psr/http-message": "^1.1 || ^2.0"
+                "psr/http-message": "^1.1 || ^2.0",
+                "psr/log": "^3.0.2"
             },
             "require-dev": {
-                "google/cloud-firestore": "^1.55.0",
-                "psr/log": "^3.0.2",
-                "symfony/var-dumper": "^7.4.4 || ^8.0.4",
-                "vlucas/phpdotenv": "^5.6.3"
+                "google/cloud-firestore": "^1.54.2",
+                "php-cs-fixer/shim": "^3.88.2",
+                "phpstan/extension-installer": "^1.4.3",
+                "phpstan/phpstan": "^2.1.31",
+                "phpstan/phpstan-deprecation-rules": "^2.0.3",
+                "phpstan/phpstan-phpunit": "^2.0.7",
+                "phpstan/phpstan-strict-rules": "^2.0.7",
+                "phpunit/phpunit": "^10.5.58",
+                "rector/rector": "^2.2.2",
+                "shipmonk/composer-dependency-analyser": "^1.8.3",
+                "symfony/var-dumper": "^6.4.15 || ^7.3.4",
+                "vlucas/phpdotenv": "^5.6.2"
             },
             "suggest": {
                 "google/cloud-firestore": "^1.0 to use the Firestore component"
@@ -2041,13 +2050,12 @@
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-7.x": "7.x-dev",
-                    "dev-8.x": "8.x-dev"
+                    "dev-7.x": "7.x-dev"
                 }
             },
             "autoload": {
                 "psr-4": {
-                    "Kreait\\Firebase\\": "src"
+                    "Kreait\\Firebase\\": "src/Firebase"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -2061,7 +2069,7 @@
                 }
             ],
             "description": "Firebase Admin SDK",
-            "homepage": "https://github.com/beste/firebase-php",
+            "homepage": "https://github.com/kreait/firebase-php",
             "keywords": [
                 "api",
                 "database",
@@ -2071,8 +2079,8 @@
             ],
             "support": {
                 "docs": "https://firebase-php.readthedocs.io",
-                "issues": "https://github.com/beste/firebase-php/issues",
-                "source": "https://github.com/beste/firebase-php"
+                "issues": "https://github.com/kreait/firebase-php/issues",
+                "source": "https://github.com/kreait/firebase-php"
             },
             "funding": [
                 {
@@ -2080,7 +2088,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-03-04T12:06:19+00:00"
+            "time": "2026-02-18T23:43:18+00:00"
         },
         {
             "name": "kreait/firebase-tokens",
@@ -2158,30 +2166,29 @@
         },
         {
             "name": "kreait/laravel-firebase",
-            "version": "7.0.0",
+            "version": "5.10.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/beste/laravel-firebase.git",
-                "reference": "c71da27eae455b8bcc8679c4ccc5725a05dfd71d"
+                "reference": "d00093fdc6ef006a489ea0fe59f1a2feb5045057"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/beste/laravel-firebase/zipball/c71da27eae455b8bcc8679c4ccc5725a05dfd71d",
-                "reference": "c71da27eae455b8bcc8679c4ccc5725a05dfd71d",
+                "url": "https://api.github.com/repos/beste/laravel-firebase/zipball/d00093fdc6ef006a489ea0fe59f1a2feb5045057",
+                "reference": "d00093fdc6ef006a489ea0fe59f1a2feb5045057",
                 "shasum": ""
             },
             "require": {
-                "illuminate/contracts": "^11.0 || ^12.0",
-                "illuminate/notifications": "^11.0 || ^12.0",
-                "illuminate/support": "^11.0 || ^12.0",
-                "kreait/firebase-php": "^8.0",
-                "php": "~8.2.0 || ~8.3.0 || ~8.4.0 || ~8.5.0",
+                "illuminate/contracts": "^9.0 || ^10.0 || ^11.0",
+                "illuminate/support": "^9.0 || ^10.0 || ^11.0",
+                "kreait/firebase-php": "^7.13",
+                "php": "~8.1.0 || ~8.2.0 || ~8.3.0 || ~8.4.0",
                 "symfony/cache": "^6.1.2 || ^7.0.3"
             },
             "require-dev": {
-                "laravel/pint": "^1.22.1",
-                "orchestra/testbench": "^9.0 || ^10.4",
-                "phpunit/phpunit": "^11.5.23"
+                "laravel/pint": "^1.14",
+                "orchestra/testbench": "^7.0 || ^8.0 || ^9.0",
+                "phpunit/phpunit": "^9.6.17 || ^10.5.13"
             },
             "type": "library",
             "extra": {
@@ -2221,15 +2228,19 @@
             ],
             "support": {
                 "issues": "https://github.com/beste/laravel-firebase/issues",
-                "source": "https://github.com/beste/laravel-firebase/tree/7.0.0"
+                "source": "https://github.com/beste/laravel-firebase/tree/5.10.0"
             },
             "funding": [
                 {
-                    "url": "https://github.com/sponsors/jeromegamez",
+                    "url": "https://github.com/jeromegamez",
                     "type": "github"
+                },
+                {
+                    "url": "https://tidelift.com/funding/github/packagist/kreait/laravel-firebase",
+                    "type": "tidelift"
                 }
             ],
-            "time": "2026-02-19T00:01:22+00:00"
+            "time": "2024-11-22T13:02:38+00:00"
         },
         {
             "name": "laravel/framework",
@@ -5896,7 +5907,7 @@
         },
         {
             "name": "symfony/polyfill-ctype",
-            "version": "v1.36.0",
+            "version": "v1.37.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-ctype.git",
@@ -5955,7 +5966,7 @@
                 "portable"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-ctype/tree/v1.36.0"
+                "source": "https://github.com/symfony/polyfill-ctype/tree/v1.37.0"
             },
             "funding": [
                 {
@@ -5979,16 +5990,16 @@
         },
         {
             "name": "symfony/polyfill-intl-grapheme",
-            "version": "v1.36.0",
+            "version": "v1.37.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-intl-grapheme.git",
-                "reference": "ad1b7b9092976d6c948b8a187cec9faaea9ec1df"
+                "reference": "4864388bfbd3001ce88e234fab652acd91fdc57e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-intl-grapheme/zipball/ad1b7b9092976d6c948b8a187cec9faaea9ec1df",
-                "reference": "ad1b7b9092976d6c948b8a187cec9faaea9ec1df",
+                "url": "https://api.github.com/repos/symfony/polyfill-intl-grapheme/zipball/4864388bfbd3001ce88e234fab652acd91fdc57e",
+                "reference": "4864388bfbd3001ce88e234fab652acd91fdc57e",
                 "shasum": ""
             },
             "require": {
@@ -6037,7 +6048,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-intl-grapheme/tree/v1.36.0"
+                "source": "https://github.com/symfony/polyfill-intl-grapheme/tree/v1.37.0"
             },
             "funding": [
                 {
@@ -6057,11 +6068,11 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-04-10T16:19:22+00:00"
+            "time": "2026-04-26T13:13:48+00:00"
         },
         {
             "name": "symfony/polyfill-intl-idn",
-            "version": "v1.36.0",
+            "version": "v1.37.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-intl-idn.git",
@@ -6124,7 +6135,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-intl-idn/tree/v1.36.0"
+                "source": "https://github.com/symfony/polyfill-intl-idn/tree/v1.37.0"
             },
             "funding": [
                 {
@@ -6148,7 +6159,7 @@
         },
         {
             "name": "symfony/polyfill-intl-normalizer",
-            "version": "v1.36.0",
+            "version": "v1.37.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-intl-normalizer.git",
@@ -6209,7 +6220,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-intl-normalizer/tree/v1.36.0"
+                "source": "https://github.com/symfony/polyfill-intl-normalizer/tree/v1.37.0"
             },
             "funding": [
                 {
@@ -6233,7 +6244,7 @@
         },
         {
             "name": "symfony/polyfill-mbstring",
-            "version": "v1.36.0",
+            "version": "v1.37.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-mbstring.git",
@@ -6294,7 +6305,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.36.0"
+                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.37.0"
             },
             "funding": [
                 {
@@ -6318,7 +6329,7 @@
         },
         {
             "name": "symfony/polyfill-php80",
-            "version": "v1.36.0",
+            "version": "v1.37.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-php80.git",
@@ -6378,7 +6389,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-php80/tree/v1.36.0"
+                "source": "https://github.com/symfony/polyfill-php80/tree/v1.37.0"
             },
             "funding": [
                 {
@@ -6402,7 +6413,7 @@
         },
         {
             "name": "symfony/polyfill-php83",
-            "version": "v1.36.0",
+            "version": "v1.37.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-php83.git",
@@ -6458,7 +6469,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-php83/tree/v1.36.0"
+                "source": "https://github.com/symfony/polyfill-php83/tree/v1.37.0"
             },
             "funding": [
                 {
@@ -6482,16 +6493,16 @@
         },
         {
             "name": "symfony/polyfill-php85",
-            "version": "v1.36.0",
+            "version": "v1.37.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-php85.git",
-                "reference": "2c408a6bb0313e6001a83628dc5506100474254e"
+                "reference": "fcfa4973a9917cef23f2e38774da74a2b7d115ee"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-php85/zipball/2c408a6bb0313e6001a83628dc5506100474254e",
-                "reference": "2c408a6bb0313e6001a83628dc5506100474254e",
+                "url": "https://api.github.com/repos/symfony/polyfill-php85/zipball/fcfa4973a9917cef23f2e38774da74a2b7d115ee",
+                "reference": "fcfa4973a9917cef23f2e38774da74a2b7d115ee",
                 "shasum": ""
             },
             "require": {
@@ -6538,7 +6549,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-php85/tree/v1.36.0"
+                "source": "https://github.com/symfony/polyfill-php85/tree/v1.37.0"
             },
             "funding": [
                 {
@@ -6558,11 +6569,11 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-04-10T16:50:15+00:00"
+            "time": "2026-04-26T13:10:57+00:00"
         },
         {
             "name": "symfony/polyfill-uuid",
-            "version": "v1.36.0",
+            "version": "v1.37.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-uuid.git",
@@ -6621,7 +6632,7 @@
                 "uuid"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-uuid/tree/v1.36.0"
+                "source": "https://github.com/symfony/polyfill-uuid/tree/v1.37.0"
             },
             "funding": [
                 {
@@ -7531,16 +7542,16 @@
         },
         {
             "name": "voku/portable-ascii",
-            "version": "2.1.0",
+            "version": "2.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/voku/portable-ascii.git",
-                "reference": "d870a33f0f79d2b4579740b0620200221ee44aeb"
+                "reference": "8e1051fe39379367aecf014f41744ce7539a856f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/voku/portable-ascii/zipball/d870a33f0f79d2b4579740b0620200221ee44aeb",
-                "reference": "d870a33f0f79d2b4579740b0620200221ee44aeb",
+                "url": "https://api.github.com/repos/voku/portable-ascii/zipball/8e1051fe39379367aecf014f41744ce7539a856f",
+                "reference": "8e1051fe39379367aecf014f41744ce7539a856f",
                 "shasum": ""
             },
             "require": {
@@ -7577,7 +7588,7 @@
             ],
             "support": {
                 "issues": "https://github.com/voku/portable-ascii/issues",
-                "source": "https://github.com/voku/portable-ascii/tree/2.1.0"
+                "source": "https://github.com/voku/portable-ascii/tree/2.1.1"
             },
             "funding": [
                 {
@@ -7601,7 +7612,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-04-16T23:10:39+00:00"
+            "time": "2026-04-26T05:33:54+00:00"
         }
     ],
     "packages-dev": [],
