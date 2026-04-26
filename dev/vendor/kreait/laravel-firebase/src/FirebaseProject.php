@@ -7,6 +7,7 @@ namespace Kreait\Laravel\Firebase;
 use Kreait\Firebase\Contract\AppCheck;
 use Kreait\Firebase\Contract\Auth;
 use Kreait\Firebase\Contract\Database;
+use Kreait\Firebase\Contract\DynamicLinks;
 use Kreait\Firebase\Contract\Firestore;
 use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Contract\RemoteConfig;
@@ -15,11 +16,17 @@ use Kreait\Firebase\Factory;
 
 class FirebaseProject
 {
+    protected Factory $factory;
+
+    protected array $config;
+
     protected ?AppCheck $appCheck = null;
 
     protected ?Auth $auth = null;
 
     protected ?Database $database = null;
+
+    protected ?DynamicLinks $dynamicLinks = null;
 
     protected ?Firestore $firestore = null;
 
@@ -29,10 +36,11 @@ class FirebaseProject
 
     protected ?Storage $storage = null;
 
-    public function __construct(
-        protected Factory $factory,
-        protected ?string $firestoreDatabase
-    ) {}
+    public function __construct(Factory $factory, array $config)
+    {
+        $this->factory = $factory;
+        $this->config = $config;
+    }
 
     public function appCheck(): AppCheck
     {
@@ -61,10 +69,19 @@ class FirebaseProject
         return $this->database;
     }
 
+    public function dynamicLinks(): DynamicLinks
+    {
+        if (! $this->dynamicLinks) {
+            $this->dynamicLinks = $this->factory->createDynamicLinksService($this->config['dynamic_links']['default_domain'] ?? null);
+        }
+
+        return $this->dynamicLinks;
+    }
+
     public function firestore(): Firestore
     {
         if (! $this->firestore) {
-            $this->firestore = $this->factory->createFirestore($this->firestoreDatabase);
+            $this->firestore = $this->factory->createFirestore();
         }
 
         return $this->firestore; // @codeCoverageIgnore

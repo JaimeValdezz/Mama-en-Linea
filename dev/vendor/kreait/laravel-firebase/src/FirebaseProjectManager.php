@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Kreait\Laravel\Firebase;
 
-use Illuminate\Contracts\Config\Repository as ConfigRepository;
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Foundation\Application;
 use Kreait\Firebase\Exception\InvalidArgumentException;
 use Kreait\Firebase\Factory;
@@ -12,29 +12,33 @@ use Kreait\Firebase\Http\HttpClientOptions;
 use Psr\SimpleCache\CacheInterface;
 use Symfony\Component\Cache\Adapter\Psr16Adapter;
 
-use function str_contains;
-use function str_starts_with;
-
 class FirebaseProjectManager
 {
+    /** @var Application */
+    protected $app;
+
     /** @var FirebaseProject[] */
     protected array $projects = [];
 
-    public function __construct(
-        protected Application $app,
-        protected ConfigRepository $config,
-    ) {}
+    public function __construct(Container $app)
+    {
+        $this->app = $app;
+    }
 
     public function project(?string $name = null): FirebaseProject
     {
         $name = $name ?? $this->getDefaultProject();
 
-        return $this->projects[$name] ??= $this->configure($name);
+        if (! isset($this->projects[$name])) {
+            $this->projects[$name] = $this->configure($name);
+        }
+
+        return $this->projects[$name];
     }
 
     protected function configuration(string $name): array
     {
-        $config = $this->config->get('firebase.projects.'.$name);
+        $config = $this->app->config->get('firebase.projects.'.$name);
 
         if (! $config) {
             throw new InvalidArgumentException("Firebase project [{$name}] not configured.");
@@ -45,9 +49,9 @@ class FirebaseProjectManager
 
     protected function resolveJsonCredentials(string $credentials): string
     {
-        $isJsonString = str_starts_with($credentials, '{');
-        $isAbsoluteLinuxPath = str_starts_with($credentials, '/');
-        $isAbsoluteWindowsPath = str_contains($credentials, ':\\');
+        $isJsonString = \str_starts_with($credentials, '{');
+        $isAbsoluteLinuxPath = \str_starts_with($credentials, '/');
+        $isAbsoluteWindowsPath = \str_contains($credentials, ':\\');
 
         $isRelativePath = ! $isJsonString && ! $isAbsoluteLinuxPath && ! $isAbsoluteWindowsPath;
 
@@ -56,7 +60,7 @@ class FirebaseProjectManager
 
     protected function configure(string $name): FirebaseProject
     {
-        $factory = $this->app->make(Factory::class);
+        $factory = new Factory();
 
         $config = $this->configuration($name);
 
@@ -78,6 +82,10 @@ class FirebaseProjectManager
 
         if ($authVariableOverride = $config['database']['auth_variable_override'] ?? null) {
             $factory = $factory->withDatabaseAuthVariableOverride($authVariableOverride);
+        }
+
+        if ($firestoreDatabase = $config['firestore']['database'] ?? null) {
+            $factory = $factory->withFirestoreDatabase($firestoreDatabase);
         }
 
         if ($defaultStorageBucket = $config['storage']['default_bucket'] ?? null) {
@@ -126,20 +134,17 @@ class FirebaseProjectManager
 
         $factory = $factory->withHttpClientOptions($options);
 
-        return new FirebaseProject(
-            $factory,
-            $config['firestore']['database'] ?? null,
-        );
+        return new FirebaseProject($factory, $config);
     }
 
     public function getDefaultProject(): string
     {
-        return $this->config->get('firebase.default');
+        return $this->app->config->get('firebase.default');
     }
 
     public function setDefaultProject(string $name): void
     {
-        $this->config->set('firebase.default', $name);
+        $this->app->config->set('firebase.default', $name);
     }
 
     public function __call($method, $parameters)
