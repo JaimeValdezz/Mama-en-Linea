@@ -90,13 +90,8 @@ class StreamOutput extends Output
     protected function hasColorSupport(): bool
     {
         // Follow https://no-color.org/
-        if ('' !== (($_SERVER['NO_COLOR'] ?? getenv('NO_COLOR'))[0] ?? '')) {
+        if (isset($_SERVER['NO_COLOR']) || false !== getenv('NO_COLOR')) {
             return false;
-        }
-
-        // Follow https://force-color.org/
-        if ('' !== (($_SERVER['FORCE_COLOR'] ?? getenv('FORCE_COLOR'))[0] ?? '')) {
-            return true;
         }
 
         // Detect msysgit/mingw and assume this is a tty because detection

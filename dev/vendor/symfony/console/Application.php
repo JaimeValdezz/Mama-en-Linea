@@ -17,11 +17,11 @@ use Symfony\Component\Console\Command\DumpCompletionCommand;
 use Symfony\Component\Console\Command\HelpCommand;
 use Symfony\Component\Console\Command\LazyCommand;
 use Symfony\Component\Console\Command\ListCommand;
+use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Console\CommandLoader\CommandLoaderInterface;
 use Symfony\Component\Console\Completion\CompletionInput;
 use Symfony\Component\Console\Completion\CompletionSuggestions;
 use Symfony\Component\Console\Completion\Suggestion;
-use Symfony\Component\Console\Event\ConsoleAlarmEvent;
 use Symfony\Component\Console\Event\ConsoleCommandEvent;
 use Symfony\Component\Console\Event\ConsoleErrorEvent;
 use Symfony\Component\Console\Event\ConsoleSignalEvent;
@@ -65,7 +65,7 @@ use Symfony\Contracts\Service\ResetInterface;
  * Usage:
  *
  *     $app = new Application('myapp', '1.0 (stable)');
- *     $app->addCommand(new SimpleCommand());
+ *     $app->add(new SimpleCommand());
  *     $app->run();
  *
  * @author Fabien Potencier <fabien@symfony.com>
@@ -88,7 +88,6 @@ class Application implements ResetInterface
     private bool $initialized = false;
     private ?SignalRegistry $signalRegistry = null;
     private array $signalsToDispatchEvent = [];
-    private ?int $alarmInterval = null;
 
     public function __construct(
         private string $name = 'UNKNOWN',
@@ -98,7 +97,7 @@ class Application implements ResetInterface
         $this->defaultCommand = 'list';
         if (\defined('SIGINT') && SignalRegistry::isSupported()) {
             $this->signalRegistry = new SignalRegistry();
-            $this->signalsToDispatchEvent = [\SIGINT, \SIGQUIT, \SIGTERM, \SIGUSR1, \SIGUSR2, \SIGALRM];
+            $this->signalsToDispatchEvent = [\SIGINT, \SIGQUIT, \SIGTERM, \SIGUSR1, \SIGUSR2];
         }
     }
 
@@ -127,30 +126,6 @@ class Application implements ResetInterface
     public function setSignalsToDispatchEvent(int ...$signalsToDispatchEvent): void
     {
         $this->signalsToDispatchEvent = $signalsToDispatchEvent;
-    }
-
-    /**
-     * Sets the interval to schedule a SIGALRM signal in seconds.
-     */
-    public function setAlarmInterval(?int $seconds): void
-    {
-        $this->alarmInterval = $seconds;
-        $this->scheduleAlarm();
-    }
-
-    /**
-     * Gets the interval in seconds on which a SIGALRM signal is dispatched.
-     */
-    public function getAlarmInterval(): ?int
-    {
-        return $this->alarmInterval;
-    }
-
-    private function scheduleAlarm(): void
-    {
-        if (null !== $this->alarmInterval) {
-            $this->getSignalRegistry()->scheduleAlarm($this->alarmInterval);
-        }
     }
 
     /**
@@ -186,12 +161,9 @@ class Application implements ResetInterface
             }
         }
 
-        $empty = new \stdClass();
-        $prevShellVerbosity = [$_ENV['SHELL_VERBOSITY'] ?? $empty, $_SERVER['SHELL_VERBOSITY'] ?? $empty, getenv('SHELL_VERBOSITY')];
+        $this->configureIO($input, $output);
 
         try {
-            $this->configureIO($input, $output);
-
             $exitCode = $this->doRun($input, $output);
         } catch (\Throwable $e) {
             if ($e instanceof \Exception && !$this->catchExceptions) {
@@ -225,18 +197,6 @@ class Application implements ResetInterface
                 if ($finalHandler !== $renderException) {
                     $phpHandler[0]->setExceptionHandler($finalHandler);
                 }
-            }
-
-            // SHELL_VERBOSITY is set by Application::configureIO so we need to unset/reset it
-            // to its previous value to avoid one command verbosity to spread to other commands
-            if ($empty === $_ENV['SHELL_VERBOSITY'] = $prevShellVerbosity[0]) {
-                unset($_ENV['SHELL_VERBOSITY']);
-            }
-            if ($empty === $_SERVER['SHELL_VERBOSITY'] = $prevShellVerbosity[1]) {
-                unset($_SERVER['SHELL_VERBOSITY']);
-            }
-            if (\function_exists('putenv')) {
-                @putenv('SHELL_VERBOSITY'.(false === ($prevShellVerbosity[2] ?? false) ? '' : '='.$prevShellVerbosity[2]));
             }
         }
 
@@ -302,9 +262,9 @@ class Application implements ResetInterface
 
                 $style = new SymfonyStyle($input, $output);
                 $output->writeln('');
-                $formattedBlock = (new FormatterHelper())->formatBlock(\sprintf('Command "%s" is not defined.', $name), 'error', true);
+                $formattedBlock = (new FormatterHelper())->formatBlock(sprintf('Command "%s" is not defined.', $name), 'error', true);
                 $output->writeln($formattedBlock);
-                if (!$style->confirm(\sprintf('Do you want to run "%s" instead? ', $alternative), false)) {
+                if (!$style->confirm(sprintf('Do you want to run "%s" instead? ', $alternative), false)) {
                     if (null !== $this->dispatcher) {
                         $event = new ConsoleErrorEvent($input, $output, $e);
                         $this->dispatcher->dispatch($event, ConsoleEvents::ERROR);
@@ -389,7 +349,10 @@ class Application implements ResetInterface
         $this->definition ??= $this->getDefaultInputDefinition();
 
         if ($this->singleCommand) {
-            $this->definition->setArguments();
+            $inputDefinition = $this->definition;
+            $inputDefinition->setArguments();
+
+            return $inputDefinition;
         }
 
         return $this->definition;
@@ -420,13 +383,6 @@ class Application implements ResetInterface
 
         if (CompletionInput::TYPE_OPTION_NAME === $input->getCompletionType()) {
             $suggestions->suggestOptions($this->getDefinition()->getOptions());
-        }
-
-        if (
-            CompletionInput::TYPE_OPTION_VALUE === $input->getCompletionType()
-            && ($definition = $this->getDefinition())->hasOption($input->getCompletionName())
-        ) {
-            $definition->getOption($input->getCompletionName())->complete($input, $suggestions);
 
             return;
         }
@@ -519,7 +475,7 @@ class Application implements ResetInterface
     {
         if ('UNKNOWN' !== $this->getName()) {
             if ('UNKNOWN' !== $this->getVersion()) {
-                return \sprintf('%s <info>%s</info>', $this->getName(), $this->getVersion());
+                return sprintf('%s <info>%s</info>', $this->getName(), $this->getVersion());
             }
 
             return $this->getName();
@@ -533,7 +489,7 @@ class Application implements ResetInterface
      */
     public function register(string $name): Command
     {
-        return $this->addCommand(new Command($name));
+        return $this->add(new Command($name));
     }
 
     /**
@@ -541,23 +497,13 @@ class Application implements ResetInterface
      *
      * If a Command is not enabled it will not be added.
      *
-     * @param callable[]|Command[] $commands An array of commands
+     * @param Command[] $commands An array of commands
      */
     public function addCommands(array $commands): void
     {
         foreach ($commands as $command) {
-            $this->addCommand($command);
+            $this->add($command);
         }
-    }
-
-    /**
-     * @deprecated since Symfony 7.4, use Application::addCommand() instead
-     */
-    public function add(Command $command): ?Command
-    {
-        trigger_deprecation('symfony/console', '7.4', 'The "%s()" method is deprecated and will be removed in Symfony 8.0, use "%s::addCommand()" instead.', __METHOD__, self::class);
-
-        return $this->addCommand($command);
     }
 
     /**
@@ -566,13 +512,9 @@ class Application implements ResetInterface
      * If a command with the same name already exists, it will be overridden.
      * If the command is not enabled it will not be added.
      */
-    public function addCommand(callable|Command $command): ?Command
+    public function add(Command $command): ?Command
     {
         $this->init();
-
-        if (!$command instanceof Command) {
-            $command = new Command(null, $command);
-        }
 
         $command->setApplication($this);
 
@@ -588,7 +530,7 @@ class Application implements ResetInterface
         }
 
         if (!$command->getName()) {
-            throw new LogicException(\sprintf('The command defined in "%s" cannot have an empty name.', get_debug_type($command)));
+            throw new LogicException(sprintf('The command defined in "%s" cannot have an empty name.', get_debug_type($command)));
         }
 
         $this->commands[$command->getName()] = $command;
@@ -610,12 +552,12 @@ class Application implements ResetInterface
         $this->init();
 
         if (!$this->has($name)) {
-            throw new CommandNotFoundException(\sprintf('The command "%s" does not exist.', $name));
+            throw new CommandNotFoundException(sprintf('The command "%s" does not exist.', $name));
         }
 
         // When the command has a different name than the one used at the command loader level
         if (!isset($this->commands[$name])) {
-            throw new CommandNotFoundException(\sprintf('The "%s" command cannot be found because it is registered under multiple names. Make sure you don\'t set a different name via constructor or "setName()".', $name));
+            throw new CommandNotFoundException(sprintf('The "%s" command cannot be found because it is registered under multiple names. Make sure you don\'t set a different name via constructor or "setName()".', $name));
         }
 
         $command = $this->commands[$name];
@@ -639,7 +581,7 @@ class Application implements ResetInterface
     {
         $this->init();
 
-        return isset($this->commands[$name]) || ($this->commandLoader?->has($name) && $this->addCommand($this->commandLoader->get($name)));
+        return isset($this->commands[$name]) || ($this->commandLoader?->has($name) && $this->add($this->commandLoader->get($name)));
     }
 
     /**
@@ -679,7 +621,7 @@ class Application implements ResetInterface
         $namespaces = preg_grep('{^'.$expr.'}', $allNamespaces);
 
         if (!$namespaces) {
-            $message = \sprintf('There are no commands defined in the "%s" namespace.', $namespace);
+            $message = sprintf('There are no commands defined in the "%s" namespace.', $namespace);
 
             if ($alternatives = $this->findAlternatives($namespace, $allNamespaces)) {
                 if (1 == \count($alternatives)) {
@@ -696,7 +638,7 @@ class Application implements ResetInterface
 
         $exact = \in_array($namespace, $namespaces, true);
         if (\count($namespaces) > 1 && !$exact) {
-            throw new NamespaceNotFoundException(\sprintf("The namespace \"%s\" is ambiguous.\nDid you mean one of these?\n%s.", $namespace, $this->getAbbreviationSuggestions(array_values($namespaces))), array_values($namespaces));
+            throw new NamespaceNotFoundException(sprintf("The namespace \"%s\" is ambiguous.\nDid you mean one of these?\n%s.", $namespace, $this->getAbbreviationSuggestions(array_values($namespaces))), array_values($namespaces));
         }
 
         return $exact ? $namespace : reset($namespaces);
@@ -743,17 +685,18 @@ class Application implements ResetInterface
                 $this->findNamespace(substr($name, 0, $pos));
             }
 
-            $message = \sprintf('Command "%s" is not defined.', $name);
+            $message = sprintf('Command "%s" is not defined.', $name);
 
             if ($alternatives = $this->findAlternatives($name, $allCommands)) {
-                $wantHelps = $this->wantHelps;
-                $this->wantHelps = false;
-
                 // remove hidden commands
-                if ($alternatives = array_filter($alternatives, fn ($name) => !$this->get($name)->isHidden())) {
-                    $message .= \sprintf("\n\nDid you mean %s?\n    %s", 1 === \count($alternatives) ? 'this' : 'one of these', implode("\n    ", $alternatives));
+                $alternatives = array_filter($alternatives, fn ($name) => !$this->get($name)->isHidden());
+
+                if (1 == \count($alternatives)) {
+                    $message .= "\n\nDid you mean this?\n    ";
+                } else {
+                    $message .= "\n\nDid you mean one of these?\n    ";
                 }
-                $this->wantHelps = $wantHelps;
+                $message .= implode("\n    ", $alternatives);
             }
 
             throw new CommandNotFoundException($message, array_values($alternatives));
@@ -773,21 +716,6 @@ class Application implements ResetInterface
 
                 return $commandName === $nameOrAlias || !\in_array($commandName, $commands, true);
             }));
-        }
-
-        // check whether all commands left are aliases to the same one
-        if (\count($commands) > 1) {
-            $uniqueCommands = array_unique(array_map(function ($nameOrAlias) use (&$commandList) {
-                if (!$commandList[$nameOrAlias] instanceof Command) {
-                    $commandList[$nameOrAlias] = $this->commandLoader->get($nameOrAlias);
-                }
-
-                return $commandList[$nameOrAlias]->getName();
-            }, $commands));
-
-            if (1 === \count($uniqueCommands)) {
-                $commands = [reset($uniqueCommands)];
-            }
         }
 
         if (\count($commands) > 1) {
@@ -812,14 +740,14 @@ class Application implements ResetInterface
             if (\count($commands) > 1) {
                 $suggestions = $this->getAbbreviationSuggestions(array_filter($abbrevs));
 
-                throw new CommandNotFoundException(\sprintf("Command \"%s\" is ambiguous.\nDid you mean one of these?\n%s.", $name, $suggestions), array_values($commands));
+                throw new CommandNotFoundException(sprintf("Command \"%s\" is ambiguous.\nDid you mean one of these?\n%s.", $name, $suggestions), array_values($commands));
             }
         }
 
-        $command = $commands ? $this->get(reset($commands)) : null;
+        $command = $this->get(reset($commands));
 
-        if (!$command || $command->isHidden()) {
-            throw new CommandNotFoundException(\sprintf('The command "%s" does not exist.', $name));
+        if ($command->isHidden()) {
+            throw new CommandNotFoundException(sprintf('The command "%s" does not exist.', $name));
         }
 
         return $command;
@@ -894,7 +822,7 @@ class Application implements ResetInterface
         $this->doRenderThrowable($e, $output);
 
         if (null !== $this->runningCommand) {
-            $output->writeln(\sprintf('<info>%s</info>', OutputFormatter::escape(\sprintf($this->runningCommand->getSynopsis(), $this->getName()))), OutputInterface::VERBOSITY_QUIET);
+            $output->writeln(sprintf('<info>%s</info>', OutputFormatter::escape(sprintf($this->runningCommand->getSynopsis(), $this->getName()))), OutputInterface::VERBOSITY_QUIET);
             $output->writeln('', OutputInterface::VERBOSITY_QUIET);
         }
     }
@@ -905,14 +833,14 @@ class Application implements ResetInterface
             $message = trim($e->getMessage());
             if ('' === $message || OutputInterface::VERBOSITY_VERBOSE <= $output->getVerbosity()) {
                 $class = get_debug_type($e);
-                $title = \sprintf('  [%s%s]  ', $class, 0 !== ($code = $e->getCode()) ? ' ('.$code.')' : '');
+                $title = sprintf('  [%s%s]  ', $class, 0 !== ($code = $e->getCode()) ? ' ('.$code.')' : '');
                 $len = Helper::width($title);
             } else {
                 $len = 0;
             }
 
             if (str_contains($message, "@anonymous\0")) {
-                $message = preg_replace_callback('/[a-zA-Z_\x7f-\xff][\\\\a-zA-Z0-9_\x7f-\xff]*+@anonymous\x00.*?\.php(?:0x?|:[0-9]++\$)?[0-9a-fA-F]++/', fn ($m) => class_exists($m[0], false) ? (get_parent_class($m[0]) ?: key(class_implements($m[0])) ?: 'class').'@anonymous' : $m[0], $message);
+                $message = preg_replace_callback('/[a-zA-Z_\x7f-\xff][\\\\a-zA-Z0-9_\x7f-\xff]*+@anonymous\x00.*?\.php(?:0x?|:[0-9]++\$)[0-9a-fA-F]++/', fn ($m) => class_exists($m[0], false) ? (get_parent_class($m[0]) ?: key(class_implements($m[0])) ?: 'class').'@anonymous' : $m[0], $message);
             }
 
             $width = $this->terminal->getWidth() ? $this->terminal->getWidth() - 1 : \PHP_INT_MAX;
@@ -929,14 +857,14 @@ class Application implements ResetInterface
 
             $messages = [];
             if (!$e instanceof ExceptionInterface || OutputInterface::VERBOSITY_VERBOSE <= $output->getVerbosity()) {
-                $messages[] = \sprintf('<comment>%s</comment>', OutputFormatter::escape(\sprintf('In %s line %s:', basename($e->getFile()) ?: 'n/a', $e->getLine() ?: 'n/a')));
+                $messages[] = sprintf('<comment>%s</comment>', OutputFormatter::escape(sprintf('In %s line %s:', basename($e->getFile()) ?: 'n/a', $e->getLine() ?: 'n/a')));
             }
-            $messages[] = $emptyLine = \sprintf('<error>%s</error>', str_repeat(' ', $len));
+            $messages[] = $emptyLine = sprintf('<error>%s</error>', str_repeat(' ', $len));
             if ('' === $message || OutputInterface::VERBOSITY_VERBOSE <= $output->getVerbosity()) {
-                $messages[] = \sprintf('<error>%s%s</error>', $title, str_repeat(' ', max(0, $len - Helper::width($title))));
+                $messages[] = sprintf('<error>%s%s</error>', $title, str_repeat(' ', max(0, $len - Helper::width($title))));
             }
             foreach ($lines as $line) {
-                $messages[] = \sprintf('<error>  %s  %s</error>', OutputFormatter::escape($line[0]), str_repeat(' ', $len - $line[1]));
+                $messages[] = sprintf('<error>  %s  %s</error>', OutputFormatter::escape($line[0]), str_repeat(' ', $len - $line[1]));
             }
             $messages[] = $emptyLine;
             $messages[] = '';
@@ -963,7 +891,7 @@ class Application implements ResetInterface
                     $file = $trace[$i]['file'] ?? 'n/a';
                     $line = $trace[$i]['line'] ?? 'n/a';
 
-                    $output->writeln(\sprintf(' %s%s at <info>%s:%s</info>', $class, $function ? $type.$function.'()' : '', $file, $line), OutputInterface::VERBOSITY_QUIET);
+                    $output->writeln(sprintf(' %s%s at <info>%s:%s</info>', $class, $function ? $type.$function.'()' : '', $file, $line), OutputInterface::VERBOSITY_QUIET);
                 }
 
                 $output->writeln('', OutputInterface::VERBOSITY_QUIET);
@@ -976,31 +904,51 @@ class Application implements ResetInterface
      */
     protected function configureIO(InputInterface $input, OutputInterface $output): void
     {
-        if ($input->hasParameterOption(['--ansi'], true)) {
+        if (true === $input->hasParameterOption(['--ansi'], true)) {
             $output->setDecorated(true);
-        } elseif ($input->hasParameterOption(['--no-ansi'], true)) {
+        } elseif (true === $input->hasParameterOption(['--no-ansi'], true)) {
             $output->setDecorated(false);
         }
 
-        $shellVerbosity = match (true) {
-            $input->hasParameterOption(['--silent'], true) => -2,
-            $input->hasParameterOption(['--quiet', '-q'], true) => -1,
-            $input->hasParameterOption('-vvv', true) || $input->hasParameterOption('--verbose=3', true) || 3 === $input->getParameterOption('--verbose', false, true) => 3,
-            $input->hasParameterOption('-vv', true) || $input->hasParameterOption('--verbose=2', true) || 2 === $input->getParameterOption('--verbose', false, true) => 2,
-            $input->hasParameterOption('-v', true) || $input->hasParameterOption('--verbose=1', true) || $input->hasParameterOption('--verbose', true) || $input->getParameterOption('--verbose', false, true) => 1,
-            default => (int) ($_ENV['SHELL_VERBOSITY'] ?? $_SERVER['SHELL_VERBOSITY'] ?? getenv('SHELL_VERBOSITY')),
-        };
+        if (true === $input->hasParameterOption(['--no-interaction', '-n'], true)) {
+            $input->setInteractive(false);
+        }
 
-        $output->setVerbosity(match ($shellVerbosity) {
-            -2 => OutputInterface::VERBOSITY_SILENT,
-            -1 => OutputInterface::VERBOSITY_QUIET,
-            1 => OutputInterface::VERBOSITY_VERBOSE,
-            2 => OutputInterface::VERBOSITY_VERY_VERBOSE,
-            3 => OutputInterface::VERBOSITY_DEBUG,
-            default => ($shellVerbosity = 0) ?: $output->getVerbosity(),
-        });
+        switch ($shellVerbosity = (int) getenv('SHELL_VERBOSITY')) {
+            case -1:
+                $output->setVerbosity(OutputInterface::VERBOSITY_QUIET);
+                break;
+            case 1:
+                $output->setVerbosity(OutputInterface::VERBOSITY_VERBOSE);
+                break;
+            case 2:
+                $output->setVerbosity(OutputInterface::VERBOSITY_VERY_VERBOSE);
+                break;
+            case 3:
+                $output->setVerbosity(OutputInterface::VERBOSITY_DEBUG);
+                break;
+            default:
+                $shellVerbosity = 0;
+                break;
+        }
 
-        if (0 > $shellVerbosity || $input->hasParameterOption(['--no-interaction', '-n'], true)) {
+        if (true === $input->hasParameterOption(['--quiet', '-q'], true)) {
+            $output->setVerbosity(OutputInterface::VERBOSITY_QUIET);
+            $shellVerbosity = -1;
+        } else {
+            if ($input->hasParameterOption('-vvv', true) || $input->hasParameterOption('--verbose=3', true) || 3 === $input->getParameterOption('--verbose', false, true)) {
+                $output->setVerbosity(OutputInterface::VERBOSITY_DEBUG);
+                $shellVerbosity = 3;
+            } elseif ($input->hasParameterOption('-vv', true) || $input->hasParameterOption('--verbose=2', true) || 2 === $input->getParameterOption('--verbose', false, true)) {
+                $output->setVerbosity(OutputInterface::VERBOSITY_VERY_VERBOSE);
+                $shellVerbosity = 2;
+            } elseif ($input->hasParameterOption('-v', true) || $input->hasParameterOption('--verbose=1', true) || $input->hasParameterOption('--verbose', true) || $input->getParameterOption('--verbose', false, true)) {
+                $output->setVerbosity(OutputInterface::VERBOSITY_VERBOSE);
+                $shellVerbosity = 1;
+            }
+        }
+
+        if (-1 === $shellVerbosity) {
             $input->setInteractive(false);
         }
 
@@ -1027,44 +975,36 @@ class Application implements ResetInterface
             }
         }
 
-        $registeredSignals = false;
-        if (($commandSignals = $command->getSubscribedSignals()) || $this->dispatcher && $this->signalsToDispatchEvent) {
-            $signalRegistry = $this->getSignalRegistry();
+        $commandSignals = $command instanceof SignalableCommandInterface ? $command->getSubscribedSignals() : [];
+        if ($commandSignals || $this->dispatcher && $this->signalsToDispatchEvent) {
+            if (!$this->signalRegistry) {
+                throw new RuntimeException('Unable to subscribe to signal events. Make sure that the "pcntl" extension is installed and that "pcntl_*" functions are not disabled by your php.ini\'s "disable_functions" directive.');
+            }
 
-            $registeredSignals = true;
-            $this->getSignalRegistry()->pushCurrentHandlers();
+            if (Terminal::hasSttyAvailable()) {
+                $sttyMode = shell_exec('stty -g');
+
+                foreach ([\SIGINT, \SIGQUIT, \SIGTERM] as $signal) {
+                    $this->signalRegistry->register($signal, static fn () => shell_exec('stty '.$sttyMode));
+                }
+            }
 
             if ($this->dispatcher) {
                 // We register application signals, so that we can dispatch the event
                 foreach ($this->signalsToDispatchEvent as $signal) {
-                    $signalEvent = new ConsoleSignalEvent($command, $input, $output, $signal);
-                    $alarmEvent = \SIGALRM === $signal ? new ConsoleAlarmEvent($command, $input, $output) : null;
+                    $event = new ConsoleSignalEvent($command, $input, $output, $signal);
 
-                    $signalRegistry->register($signal, function ($signal) use ($signalEvent, $alarmEvent, $command, $commandSignals, $input, $output) {
-                        $this->dispatcher->dispatch($signalEvent, ConsoleEvents::SIGNAL);
-                        $exitCode = $signalEvent->getExitCode();
-
-                        if (null !== $alarmEvent) {
-                            if (false !== $exitCode) {
-                                $alarmEvent->setExitCode($exitCode);
-                            } else {
-                                $alarmEvent->abortExit();
-                            }
-                            $this->dispatcher->dispatch($alarmEvent);
-                            $exitCode = $alarmEvent->getExitCode();
-                        }
+                    $this->signalRegistry->register($signal, function ($signal) use ($event, $command, $commandSignals) {
+                        $this->dispatcher->dispatch($event, ConsoleEvents::SIGNAL);
+                        $exitCode = $event->getExitCode();
 
                         // If the command is signalable, we call the handleSignal() method
                         if (\in_array($signal, $commandSignals, true)) {
                             $exitCode = $command->handleSignal($signal, $exitCode);
                         }
 
-                        if (\SIGALRM === $signal) {
-                            $this->scheduleAlarm();
-                        }
-
                         if (false !== $exitCode) {
-                            $event = new ConsoleTerminateEvent($command, $input, $output, $exitCode, $signal);
+                            $event = new ConsoleTerminateEvent($command, $event->getInput(), $event->getOutput(), $exitCode, $signal);
                             $this->dispatcher->dispatch($event, ConsoleEvents::TERMINATE);
 
                             exit($event->getExitCode());
@@ -1077,11 +1017,7 @@ class Application implements ResetInterface
             }
 
             foreach ($commandSignals as $signal) {
-                $signalRegistry->register($signal, function (int $signal) use ($command): void {
-                    if (\SIGALRM === $signal) {
-                        $this->scheduleAlarm();
-                    }
-
+                $this->signalRegistry->register($signal, function (int $signal) use ($command): void {
                     if (false !== $exitCode = $command->handleSignal($signal)) {
                         exit($exitCode);
                     }
@@ -1090,13 +1026,7 @@ class Application implements ResetInterface
         }
 
         if (null === $this->dispatcher) {
-            try {
-                return $command->run($input, $output);
-            } finally {
-                if ($registeredSignals) {
-                    $this->getSignalRegistry()->popPreviousHandlers();
-                }
-            }
+            return $command->run($input, $output);
         }
 
         // bind before the console.command event, so the listeners have access to input options/arguments
@@ -1126,10 +1056,6 @@ class Application implements ResetInterface
             if (0 === $exitCode = $event->getExitCode()) {
                 $e = null;
             }
-        } finally {
-            if ($registeredSignals) {
-                $this->getSignalRegistry()->popPreviousHandlers();
-            }
         }
 
         $event = new ConsoleTerminateEvent($command, $input, $output, $exitCode);
@@ -1158,8 +1084,7 @@ class Application implements ResetInterface
         return new InputDefinition([
             new InputArgument('command', InputArgument::REQUIRED, 'The command to execute'),
             new InputOption('--help', '-h', InputOption::VALUE_NONE, 'Display help for the given command. When no command is given display help for the <info>'.$this->defaultCommand.'</info> command'),
-            new InputOption('--silent', null, InputOption::VALUE_NONE, 'Do not output any message'),
-            new InputOption('--quiet', '-q', InputOption::VALUE_NONE, 'Only errors are displayed. All other output is suppressed'),
+            new InputOption('--quiet', '-q', InputOption::VALUE_NONE, 'Do not output any message'),
             new InputOption('--verbose', '-v|vv|vvv', InputOption::VALUE_NONE, 'Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug'),
             new InputOption('--version', '-V', InputOption::VALUE_NONE, 'Display this application version'),
             new InputOption('--ansi', '', InputOption::VALUE_NEGATABLE, 'Force (or disable --no-ansi) ANSI output', null),
@@ -1304,7 +1229,7 @@ class Application implements ResetInterface
 
             foreach (preg_split('//u', $m[0]) as $char) {
                 // test if $char could be appended to current line
-                if (Helper::width($line.$char) <= $width) {
+                if (mb_strwidth($line.$char, 'utf8') <= $width) {
                     $line .= $char;
                     continue;
                 }
@@ -1350,14 +1275,8 @@ class Application implements ResetInterface
         }
         $this->initialized = true;
 
-        if ((new \ReflectionMethod($this, 'add'))->getDeclaringClass()->getName() !== (new \ReflectionMethod($this, 'addCommand'))->getDeclaringClass()->getName()) {
-            $adder = $this->add(...);
-        } else {
-            $adder = $this->addCommand(...);
-        }
-
         foreach ($this->getDefaultCommands() as $command) {
-            $adder($command);
+            $this->add($command);
         }
     }
 }
