@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
 use Kreait\Laravel\Firebase\Facades\Firebase;
+use Google\Cloud\Firestore\FirestoreClient; // 🔥 IMPORTANTE
 
 class LoginController extends Controller
 {
@@ -25,10 +26,6 @@ class LoginController extends Controller
 
     public function login(Request $request)
     {
-        // 🔥 Forzar uso de REST (evita gRPC)
-        putenv('GOOGLE_CLOUD_DISABLE_GRPC=true');
-        putenv('FIREBASE_PREFER_REST=true');
-
         $request->validate([
             'phone'    => 'required|string',
             'password' => 'required|string',
@@ -43,8 +40,13 @@ class LoginController extends Controller
             $auth = Firebase::auth();
             $userRecord = $auth->getUserByPhoneNumber($firebasePhone);
 
-            // 3. Obtener datos de perfil en Firestore
-            $database = Firebase::firestore()->database();
+            // 🔥 3. Firestore usando REST (compatible con Railway)
+            $firestore = new FirestoreClient([
+                'keyFile' => json_decode(env('FIREBASE_CREDENTIALS_JSON'), true),
+                'transport' => 'rest',
+            ]);
+
+            $database = $firestore;
 
             $userDoc = $database
                 ->collection('Usuarios')
@@ -55,19 +57,19 @@ class LoginController extends Controller
                 $userData = $userDoc->data();
                 $rol = isset($userData['rol']) ? trim($userData['rol']) : 'usuario';
 
-                // 4. Guardar datos en la Sesión de Laravel
+                // 4. Guardar sesión
                 Session::put('firebase_user', [
                     'uid'    => $userRecord->uid,
                     'nombre' => $userData['nombre_completo'] ?? 'Usuario',
                     'rol'    => $rol
                 ]);
 
-                // Redirección por rol
+                // Redirecciones
                 if ($rol === 'admin') {
                     return redirect()->route('admin.gestion')
                         ->with('success', 'Bienvenido al panel de administración.');
-                } 
-                
+                }
+
                 if ($rol === 'empresa') {
                     return redirect()->route('vacantes.crear')
                         ->with('success', 'Acceso concedido. Puedes publicar tu vacante.');
