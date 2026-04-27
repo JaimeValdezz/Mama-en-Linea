@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
 use Kreait\Laravel\Firebase\Facades\Firebase;
-use Google\Cloud\Firestore\FirestoreClient; // 🔥 IMPORTANTE
+use Google\Cloud\Firestore\FirestoreClient;
 
 class LoginController extends Controller
 {
@@ -40,9 +40,9 @@ class LoginController extends Controller
             $auth = Firebase::auth();
             $userRecord = $auth->getUserByPhoneNumber($firebasePhone);
 
-            // 🔥 3. Firestore usando REST (compatible con Railway)
+            // 🔥 3. Firestore usando archivo (SOLUCIÓN DEFINITIVA)
             $firestore = new FirestoreClient([
-                'keyFile' => json_decode(env('FIREBASE_CREDENTIALS_JSON'), true),
+                'keyFilePath' => storage_path('app/firebase-credentials.json'),
                 'transport' => 'rest',
             ]);
 
@@ -57,14 +57,12 @@ class LoginController extends Controller
                 $userData = $userDoc->data();
                 $rol = isset($userData['rol']) ? trim($userData['rol']) : 'usuario';
 
-                // 4. Guardar sesión
                 Session::put('firebase_user', [
                     'uid'    => $userRecord->uid,
                     'nombre' => $userData['nombre_completo'] ?? 'Usuario',
                     'rol'    => $rol
                 ]);
 
-                // Redirecciones
                 if ($rol === 'admin') {
                     return redirect()->route('admin.gestion')
                         ->with('success', 'Bienvenido al panel de administración.');
