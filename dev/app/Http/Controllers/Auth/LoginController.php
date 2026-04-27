@@ -25,6 +25,10 @@ class LoginController extends Controller
 
     public function login(Request $request)
     {
+        // 🔥 Forzar uso de REST (evita gRPC)
+        putenv('GOOGLE_CLOUD_DISABLE_GRPC=true');
+        putenv('FIREBASE_PREFER_REST=true');
+
         $request->validate([
             'phone'    => 'required|string',
             'password' => 'required|string',
@@ -40,12 +44,15 @@ class LoginController extends Controller
             $userRecord = $auth->getUserByPhoneNumber($firebasePhone);
 
             // 3. Obtener datos de perfil en Firestore
-            $database = Firebase::firestore()->database(['transport' => 'rest']);
-            $userDoc = $database->collection('Usuarios')->document($userRecord->uid)->snapshot();
+            $database = Firebase::firestore()->database();
+
+            $userDoc = $database
+                ->collection('Usuarios')
+                ->document($userRecord->uid)
+                ->snapshot();
 
             if ($userDoc->exists()) {
                 $userData = $userDoc->data();
-                // Usamos trim para evitar errores por espacios invisibles en la base de datos
                 $rol = isset($userData['rol']) ? trim($userData['rol']) : 'usuario';
 
                 // 4. Guardar datos en la Sesión de Laravel
@@ -55,29 +62,31 @@ class LoginController extends Controller
                     'rol'    => $rol
                 ]);
 
-                // --- LÓGICA DE REDIRECCIÓN POR ROL ---
-
-                // Si es ADMINISTRADOR -> Al Panel de Gestión
+                // Redirección por rol
                 if ($rol === 'admin') {
-                    return redirect()->route('admin.gestion')->with('success', 'Bienvenido al panel de administración.');
+                    return redirect()->route('admin.gestion')
+                        ->with('success', 'Bienvenido al panel de administración.');
                 } 
                 
-                // Si es EMPRESA -> A Publicar Vacante (según tu ruta vacantes.crear)
                 if ($rol === 'empresa') {
-                    return redirect()->route('vacantes.crear')->with('success', 'Acceso concedido. Puedes publicar tu vacante.');
+                    return redirect()->route('vacantes.crear')
+                        ->with('success', 'Acceso concedido. Puedes publicar tu vacante.');
                 }
 
-                // Cualquier otro rol (como 'usuario') -> A la Home
                 return redirect()->route('home');
 
             } else {
-                return back()->withErrors(['phone' => 'El perfil de usuario no existe en Firestore.'])->withInput();
+                return back()->withErrors([
+                    'phone' => 'El perfil de usuario no existe en Firestore.'
+                ])->withInput();
             }
 
         } catch (\Exception $e) {
-            // Captura errores de Firebase o de conexión para evitar la pantalla en blanco
             \Log::error('Error de Login: ' . $e->getMessage());
-            return back()->withErrors(['phone' => 'Error de autenticación: ' . $e->getMessage()])->withInput();
+
+            return back()->withErrors([
+                'phone' => 'Error de autenticación: ' . $e->getMessage()
+            ])->withInput();
         }
     }
 }
