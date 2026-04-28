@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
-use Kreait\Laravel\Firebase\Facades\Firebase;
 use Google\Cloud\Firestore\FirestoreClient;
+use Kreait\Firebase\Factory; // 👈 IMPORTANTE
 
 class LoginController extends Controller
 {
@@ -32,23 +32,25 @@ class LoginController extends Controller
         ]);
 
         try {
-            // 1. Formatear el teléfono para Firebase
+            // 1. Formatear teléfono
             $cleanPhone = preg_replace('/[^0-9]/', '', $request->phone);
             $firebasePhone = '+52' . ltrim($cleanPhone, '0');
 
-            // 2. Buscar usuario en Firebase Auth
-            $auth = Firebase::auth();
+            // 🔥 2. Firebase Auth CORRECTO
+            $factory = (new Factory)
+                ->withServiceAccount(storage_path('app/firebase-credentials.json'));
+
+            $auth = $factory->createAuth();
+
             $userRecord = $auth->getUserByPhoneNumber($firebasePhone);
 
-            // 🔥 3. Firestore usando archivo (SOLUCIÓN DEFINITIVA)
+            // 🔥 3. Firestore (REST)
             $firestore = new FirestoreClient([
                 'keyFilePath' => storage_path('app/firebase-credentials.json'),
                 'transport' => 'rest',
             ]);
 
-            $database = $firestore;
-
-            $userDoc = $database
+            $userDoc = $firestore
                 ->collection('Usuarios')
                 ->document($userRecord->uid)
                 ->snapshot();
