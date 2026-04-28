@@ -1,3 +1,12 @@
+<?php
+
+namespace App\Http\Controllers\Auth; // 👈 Asegúrate que NO diga "dev" aquí.
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Session;
+use Kreait\LaravelFirebase\Facades\Firebase;
+// ... otras importaciones
 private function getFirestore()
 {
     $credentials = json_decode(env('FIREBASE_CREDENTIALS_JSON'), true);
