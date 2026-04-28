@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Session;
-use Kreait\LaravelFirebase\Facades\Firebase;
+use Kreait\Firebase\Contract\Auth;
 use Illuminate\Support\Facades\Log;
 
 class LoginController extends Controller
