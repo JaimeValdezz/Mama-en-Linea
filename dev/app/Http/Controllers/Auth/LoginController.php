@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
 use Google\Cloud\Firestore\FirestoreClient;
-use Kreait\Firebase\Factory; // 👈 IMPORTANTE
+use Kreait\Firebase\Factory; //  IMPORTANTE
 
 class LoginController extends Controller
 {
@@ -36,9 +36,9 @@ class LoginController extends Controller
             $cleanPhone = preg_replace('/[^0-9]/', '', $request->phone);
             $firebasePhone = '+52' . ltrim($cleanPhone, '0');
 
-            // 🔥 2. Firebase Auth CORRECTO
+            //  2. Firebase Auth CORRECTO
             $factory = (new Factory)
-                ->withServiceAccount(storage_path('app/firebase-credentials.json'));
+               ->withServiceAccount(json_decode(env('FIREBASE_CREDENTIALS_JSON'), true));
 
             $auth = $factory->createAuth();
 
