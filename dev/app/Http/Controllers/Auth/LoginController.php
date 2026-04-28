@@ -1,11 +1,13 @@
 <?php
+
 namespace App\Http\Controllers\Auth;
 
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Session;
-use Kreait\Firebase\Contract\Auth;
 use Illuminate\Support\Facades\Log;
+// Importamos la fachada correcta desde la raíz de las librerías
+use Kreait\LaravelFirebase\Facades\Firebase; 
 
 class LoginController extends Controller
 {
@@ -17,7 +19,7 @@ class LoginController extends Controller
         return new \Google\Cloud\Firestore\FirestoreClient([
             'projectId' => $credentials['project_id'] ?? null,
             'keyFile'   => $credentials,
-            'transport' => 'rest',
+            'transport' => 'rest', // Vital para Railway
         ]);
     }
 
@@ -32,7 +34,8 @@ class LoginController extends Controller
             $cleanPhone = preg_replace('/[^0-9]/', '', $request->phone);
             $firebasePhone = '+52' . ltrim($cleanPhone, '0');
 
-            $auth = Firebase::auth();
+            // 🔹 Cambiamos la forma de llamar al Auth para que no se confunda
+            $auth = app('firebase.auth'); 
             $userRecord = $auth->getUserByPhoneNumber($firebasePhone);
 
             $firestore = $this->getFirestore();
