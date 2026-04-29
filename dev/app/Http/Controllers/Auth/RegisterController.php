@@ -4,19 +4,37 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Session;
-use Kreait\Laravel\Firebase\Facades\Firebase;
+use Google\Cloud\Firestore\FirestoreClient; // Añadimos esto para el parche
 
 class RegisterController extends Controller
 {
     public function showRegistrationForm() { return view('auth.register'); }
 
-    // Esta es la función que usará la ruta de empresas
+    /**
+     * Parche para obtener Firestore con transporte REST y limpieza de llave
+     */
+    private function getFirestore()
+    {
+        $json = env('FIREBASE_CREDENTIALS_JSON');
+        $credentials = json_decode($json, true);
+
+        if (isset($credentials['private_key'])) {
+            $credentials['private_key'] = str_replace(['\\n', "\n"], "\n", $credentials['private_key']);
+        }
+
+        return new FirestoreClient([
+            'projectId' => $credentials['project_id'] ?? 'proyectointegrador-43071',
+            'keyFile'   => $credentials,
+            'transport' => 'rest', // 🚀 Crucial para Railway
+        ]);
+    }
+
     public function registerEmpresa(Request $request)
     {
-        // Forzamos el rol a 'empresa' antes de validar y procesar
         $request->merge(['rol' => 'empresa']);
         return $this->register($request);
     }
@@ -36,8 +54,8 @@ class RegisterController extends Controller
             $cleanPhone = preg_replace('/[^0-9]/', '', $request->phone);
             $firebasePhone = '+52' . ltrim($cleanPhone, '0');
 
-            // 1. Registro en Firebase Auth
-            $auth = Firebase::auth();
+            // 1. Registro en Firebase Auth (usando el helper app() para evitar conflictos)
+            $auth = app('firebase.auth');
             $userRecord = $auth->createUser([
                 'phoneNumber' => $firebasePhone,
                 'password'    => $request->password,
@@ -46,11 +64,11 @@ class RegisterController extends Controller
 
             $uid = $userRecord->uid;
 
-            // 2. GUARDAR EN FIRESTORE
-            $database = Firebase::firestore()->database(['transport' => 'rest']);
+            // 2. GUARDAR EN FIRESTORE usando el parche de limpieza
+            $firestore = $this->getFirestore();
             $rolAsignado = $request->rol;
 
-            $database->collection('Usuarios')
+            $firestore->collection('Usuarios')
                 ->document($uid)
                 ->set([
                     'uid'             => $uid,
@@ -67,18 +85,24 @@ class RegisterController extends Controller
                 'rol'    => $rolAsignado 
             ]);
             
-            \Log::info("Nuevo registro: {$request->name} con rol: {$rolAsignado}");
+            Log::info("Nuevo registro exitoso: {$request->name} con rol: {$rolAsignado}");
 
             // Redirección inteligente
             if ($rolAsignado === 'empresa') {
-                return redirect()->route('vacantes.crear')->with('success', '¡Registro de empresa exitoso! Ya puedes publicar.');
+                return redirect()->route('vacantes.index')->with('success', '¡Registro de empresa exitoso! Ya puedes gestionar vacantes.');
             }
 
             return redirect()->route('home')->with('success', '¡Registro exitoso!');
 
         } catch (\Exception $e) {
-            \Log::error('Error Firebase Register: ' . $e->getMessage());
-            return back()->withErrors(['phone' => 'El número ya está registrado o hubo un error de conexión.'])->withInput();
+            Log::error('Error Firebase Register: ' . $e->getMessage());
+            
+            // Si el error contiene "invalid_grant", ya sabemos que es el JSON de Railway
+            $msg = str_contains($e->getMessage(), 'invalid_grant') 
+                ? 'Error de credenciales en el servidor. Revisa el JSON de Firebase.' 
+                : 'El número ya está registrado o hubo un error de conexión.';
+
+            return back()->withErrors(['phone' => $msg])->withInput();
         }
     }
 }
