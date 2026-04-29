@@ -11,18 +11,21 @@ class VacanteController extends Controller
 {
     private function getFirestore()
     {
+        // 1. Cargamos el JSON desde las variables de entorno de Railway
         $json = env('FIREBASE_CREDENTIALS_JSON');
         $credentials = json_decode($json, true);
 
-        // 💡 PARCHE CRÍTICO: Sin esto la página de vacantes se congela
+        // 💡 MEJORA DEL PARCHE CRÍTICO: 
+        // Usamos un array en str_replace para limpiar tanto el texto literal "\n" 
+        // como posibles dobles escapes que causan el "invalid_grant".
         if (isset($credentials['private_key'])) {
-            $credentials['private_key'] = str_replace('\n', "\n", $credentials['private_key']);
+            $credentials['private_key'] = str_replace(['\\n', "\n"], "\n", $credentials['private_key']);
         }
 
         return new FirestoreClient([
             'projectId' => $credentials['project_id'] ?? 'proyectointegrador-43071',
             'keyFile'   => $credentials,
-            'transport' => 'rest', // Vital para que Railway no pida gRPC
+            'transport' => 'rest', // 🚀 Vital para evitar el "Application failed to respond"
         ]);
     }
 
@@ -41,7 +44,7 @@ class VacanteController extends Controller
                     $data = $document->data();
                     $aprobada = $data['is_approved'] ?? false;
 
-                    // Verificación flexible de booleano
+                    // Verificación flexible de booleano para evitar errores de tipo de dato
                     if ($aprobada == true || $aprobada == 'true') {
                         $vacantes[] = array_merge(['id' => $document->id()], $data);
                     }
@@ -52,8 +55,10 @@ class VacanteController extends Controller
             return view('auth.vacantes', compact('vacantes'));
 
         } catch (\Exception $e) {
+            // Logeamos el error exacto para verlo en los Deploy Logs de Railway
             Log::error("Firestore error en index: " . $e->getMessage());
-            return view('auth.vacantes', ['vacantes' => []])->with('error', 'Error al cargar vacantes.');
+            return view('auth.vacantes', ['vacantes' => []])
+                ->with('error', 'Error al cargar vacantes: ' . $e->getMessage());
         }
     }
 
@@ -69,7 +74,7 @@ class VacanteController extends Controller
                 'lugar'          => $request->lugar,
                 'descripcion'    => $request->descripcion,
                 'contacto'       => $request->contacto,
-                'is_approved'    => false,
+                'is_approved'    => false, // Siempre por aprobar al inicio
                 'created_at'     => now()->toIso8601String()
             ]);
 
