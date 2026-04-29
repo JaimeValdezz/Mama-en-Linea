@@ -11,11 +11,18 @@ class VacanteController extends Controller
 {
     private function getFirestore()
     {
-        $credentials = json_decode(env('FIREBASE_CREDENTIALS_JSON'), true);
+        $json = env('FIREBASE_CREDENTIALS_JSON');
+        $credentials = json_decode($json, true);
+
+        // 💡 PARCHE CRÍTICO: Sin esto la página de vacantes se congela
+        if (isset($credentials['private_key'])) {
+            $credentials['private_key'] = str_replace('\n', "\n", $credentials['private_key']);
+        }
 
         return new FirestoreClient([
-            'keyFile' => $credentials,
-            'transport' => 'rest',
+            'projectId' => $credentials['project_id'] ?? 'proyectointegrador-43071',
+            'keyFile'   => $credentials,
+            'transport' => 'rest', // Vital para que Railway no pida gRPC
         ]);
     }
 
@@ -26,6 +33,7 @@ class VacanteController extends Controller
         try {
             $firestore = $this->getFirestore();
 
+            // Esto obtiene los documentos de la colección
             $documents = $firestore->collection('Vacantes')->documents();
 
             foreach ($documents as $document) {
@@ -33,17 +41,19 @@ class VacanteController extends Controller
                     $data = $document->data();
                     $aprobada = $data['is_approved'] ?? false;
 
+                    // Verificación flexible de booleano
                     if ($aprobada == true || $aprobada == 'true') {
                         $vacantes[] = array_merge(['id' => $document->id()], $data);
                     }
                 }
             }
 
+            // Asegúrate de que la vista exista en resources/views/auth/vacantes.blade.php
             return view('auth.vacantes', compact('vacantes'));
 
         } catch (\Exception $e) {
-            Log::error("Firestore error: " . $e->getMessage());
-            return view('auth.vacantes', ['vacantes' => []]);
+            Log::error("Firestore error en index: " . $e->getMessage());
+            return view('auth.vacantes', ['vacantes' => []])->with('error', 'Error al cargar vacantes.');
         }
     }
 
@@ -64,10 +74,11 @@ class VacanteController extends Controller
             ]);
 
             return redirect()->route('vacantes.index')
-                ->with('success', '¡Vacante publicada con éxito!');
+                ->with('success', '¡Vacante publicada con éxito! Esperando aprobación.');
 
         } catch (\Exception $e) {
-            return back()->with('error', 'Error: ' . $e->getMessage());
+            Log::error("Firestore error en store: " . $e->getMessage());
+            return back()->with('error', 'No se pudo publicar: ' . $e->getMessage());
         }
     }
 }
