@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Log;
-// Importamos la fachada correcta desde la raíz de las librerías
+// Importamos la fachada correcta
 use Kreait\LaravelFirebase\Facades\Firebase; 
 
 class LoginController extends Controller
@@ -16,10 +16,16 @@ class LoginController extends Controller
         $json = env('FIREBASE_CREDENTIALS_JSON');
         $credentials = json_decode($json, true);
 
+        // 💡 CORRECCIÓN 1: Limpieza de la llave privada
+        // Esto convierte el texto "\n" en saltos de línea reales que Google requiere
+        if (isset($credentials['private_key'])) {
+            $credentials['private_key'] = str_replace('\n', "\n", $credentials['private_key']);
+        }
+
         return new \Google\Cloud\Firestore\FirestoreClient([
-            'projectId' => $credentials['project_id'] ?? null,
+            'projectId' => $credentials['project_id'] ?? 'proyectointegrador-43071',
             'keyFile'   => $credentials,
-            'transport' => 'rest', // Vital para Railway
+            'transport' => 'rest', // 💡 CORRECCIÓN 2: Vital para Railway sin gRPC
         ]);
     }
 
@@ -34,7 +40,7 @@ class LoginController extends Controller
             $cleanPhone = preg_replace('/[^0-9]/', '', $request->phone);
             $firebasePhone = '+52' . ltrim($cleanPhone, '0');
 
-            // 🔹 Cambiamos la forma de llamar al Auth para que no se confunda
+            // 🔹 Usamos el asistente app() para evitar conflictos de clases
             $auth = app('firebase.auth'); 
             $userRecord = $auth->getUserByPhoneNumber($firebasePhone);
 
@@ -55,6 +61,7 @@ class LoginController extends Controller
                     'rol'    => $rol
                 ]);
 
+                // 🔹 Redirecciones basadas en Rol
                 if ($rol === 'admin') {
                     return redirect()->route('admin.gestion')->with('success', 'Bienvenido admin');
                 }
@@ -70,7 +77,9 @@ class LoginController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Login error: ' . $e->getMessage());
-            return back()->withErrors(['phone' => 'Error: ' . $e->getMessage()]);
+            
+            // Si el error sigue siendo invalid_grant, es por la caché o el JSON
+            return back()->withErrors(['phone' => 'Error de autenticación: ' . $e->getMessage()]);
         }
     }
 }
