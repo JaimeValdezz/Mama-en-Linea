@@ -11,13 +11,16 @@ class VacanteController extends Controller
 {
     private function getFirestore()
     {
-        // 1. Cargamos el JSON desde las variables de entorno de Railway
-        $json = env('FIREBASE_CREDENTIALS_JSON');
-        $credentials = json_decode($json, true);
+        // 1. Cargamos el JSON crudo
+        $jsonRaw = env('FIREBASE_CREDENTIALS_JSON');
 
-        // 💡 MEJORA DEL PARCHE CRÍTICO: 
-        // Usamos un array en str_replace para limpiar tanto el texto literal "\n" 
-        // como posibles dobles escapes que causan el "invalid_grant".
+        // 2. PARCHE CRÍTICO PARA RAILWAY:
+        // Limpiamos las barras invertidas y escapes que Railway mete automáticamente
+        $jsonClean = str_replace(['\\n', '\\"'], ["\n", '"'], $jsonRaw);
+        
+        $credentials = json_decode($jsonClean, true);
+
+        // 3. Verificación extra de la llave privada
         if (isset($credentials['private_key'])) {
             $credentials['private_key'] = str_replace(['\\n', "\n"], "\n", $credentials['private_key']);
         }
@@ -44,18 +47,17 @@ class VacanteController extends Controller
                     $data = $document->data();
                     $aprobada = $data['is_approved'] ?? false;
 
-                    // Verificación flexible de booleano para evitar errores de tipo de dato
+                    // Verificación flexible de booleano
                     if ($aprobada == true || $aprobada == 'true') {
                         $vacantes[] = array_merge(['id' => $document->id()], $data);
                     }
                 }
             }
 
-            // Asegúrate de que la vista exista en resources/views/auth/vacantes.blade.php
             return view('auth.vacantes', compact('vacantes'));
 
         } catch (\Exception $e) {
-            // Logeamos el error exacto para verlo en los Deploy Logs de Railway
+            // Logeamos el error exacto para verlo en Railway
             Log::error("Firestore error en index: " . $e->getMessage());
             return view('auth.vacantes', ['vacantes' => []])
                 ->with('error', 'Error al cargar vacantes: ' . $e->getMessage());
@@ -74,7 +76,7 @@ class VacanteController extends Controller
                 'lugar'          => $request->lugar,
                 'descripcion'    => $request->descripcion,
                 'contacto'       => $request->contacto,
-                'is_approved'    => false, // Siempre por aprobar al inicio
+                'is_approved'    => false, 
                 'created_at'     => now()->toIso8601String()
             ]);
 
