@@ -9,11 +9,32 @@ use Illuminate\Support\Facades\Log;
 
 class AdminController extends Controller
 {
+    /**
+     * Limpia y obtiene las credenciales de Firebase desde Railway
+     */
+    private function getFirebaseDatabase()
+    {
+        // Obtenemos el JSON crudo de la variable de entorno
+        $jsonRaw = env('FIREBASE_CREDENTIALS_JSON');
+        
+        // Limpiamos basura de escape (diagonales y saltos de línea mal formateados)
+        $jsonClean = str_replace(['\\n', '\\"'], ["\n", '"'], $jsonRaw);
+        
+        // Decodificamos a un array
+        $credentials = json_decode($jsonClean, true);
+
+        // Retornamos la base de datos Firestore configurada manualmente
+        return Firebase::withServiceAccount($credentials)
+            ->firestore()
+            ->database();
+    }
+
     public function gestion()
     {
         $vacantes = [];
         try {
-            $database = Firebase::firestore()->database();
+            // Usamos nuestra función de limpieza para conectar
+            $database = $this->getFirebaseDatabase();
             $documents = $database->collection('Vacantes')->documents();
 
             foreach ($documents as $document) {
@@ -27,7 +48,8 @@ class AdminController extends Controller
             return view('auth.admin-gestion', compact('vacantes'));
             
         } catch (\Exception $e) {
-            Log::error("Error en Admin Firestore: " . $e->getMessage());
+            // Este log aparecerá en "View Logs" de Railway si algo falla
+            Log::error("Error en Admin Firestore (Gestion): " . $e->getMessage());
             return view('auth.admin-gestion', ['vacantes' => collect([])]);
         }
     }
@@ -35,18 +57,15 @@ class AdminController extends Controller
     public function toggle($id)
     {
         try {
-            $database = Firebase::firestore()->database(['transport' => 'rest']);
+            // Usamos la conexión limpia también aquí
+            $database = $this->getFirebaseDatabase();
             $docRef = $database->collection('Vacantes')->document($id);
             $snapshot = $docRef->snapshot();
 
             if ($snapshot->exists()) {
-                // CORRECCIÓN: Obtenemos los datos primero para verificar el campo
                 $data = $snapshot->data();
-                
-                // Si el campo 'is_approved' existe, tomamos su valor; si no, es false
                 $currentStatus = isset($data['is_approved']) ? $data['is_approved'] : false;
                 
-                // Usamos set con ['merge' => true] para crear el campo si no existe
                 $docRef->set([
                     'is_approved' => !$currentStatus
                 ], ['merge' => true]);
