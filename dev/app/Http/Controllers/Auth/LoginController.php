@@ -15,6 +15,9 @@ class LoginController extends Controller
         return view('auth.login');
     }
 
+    /**
+     * Parche de Doble Decodificación para Railway
+     */
     private function getFirestore()
     {
         $jsonRaw = env('FIREBASE_CREDENTIALS_JSON');
@@ -23,21 +26,33 @@ class LoginController extends Controller
             throw new \Exception('FIREBASE_CREDENTIALS_JSON no existe en Railway');
         }
 
-        // 💡 LIMPIEZA PROFUNDA: Quitamos las barras extra que Railway mete (visto en tu Raw Editor)
+        // 1. Limpieza inicial de caracteres basura vistos en Raw Editor
         $jsonClean = str_replace(['\\n', '\\"'], ["\n", '"'], $jsonRaw);
+        
+        // 2. Quitamos comillas que Railway pone al inicio y al final del bloque
+        $jsonClean = trim($jsonClean, '" ');
+
+        // 3. PRIMER INTENTO: Convertir a array o string limpio
         $credentials = json_decode($jsonClean, true);
 
-        if (!$credentials || !isset($credentials['private_key'])) {
-            throw new \Exception('FIREBASE_CREDENTIALS_JSON inválido después de limpieza');
+        // 4. SEGUNDO INTENTO (Doble Escapado): 
+        // Si Railway envolvió el JSON en un string, $credentials será un string y no un array.
+        if (is_string($credentials)) {
+            $credentials = json_decode($credentials, true);
         }
 
-        // Aseguramos saltos de línea reales en la llave
+        if (!is_array($credentials) || !isset($credentials['private_key'])) {
+            Log::error("Error crítico: El JSON no se pudo convertir a array. Contenido: " . substr($jsonClean, 0, 50));
+            throw new \Exception('FIREBASE_CREDENTIALS_JSON inválido después de limpieza profunda');
+        }
+
+        // 5. Aseguramos saltos de línea reales en la llave privada
         $credentials['private_key'] = str_replace(['\\n', "\n"], "\n", $credentials['private_key']);
 
         return new FirestoreClient([
             'projectId' => $credentials['project_id'] ?? 'proyectointegrador-43071',
             'keyFile'   => $credentials,
-            'transport' => 'rest', // ✅ CORREGIDO: Era 'rest', no 'reset'
+            'transport' => 'rest', // ✅ Vital para entornos serverless/Railway
         ]);
     }
 
@@ -52,8 +67,8 @@ class LoginController extends Controller
             $cleanPhone = preg_replace('/[^0-9]/', '', $request->phone);
             $firebasePhone = '+52' . ltrim($cleanPhone, '0');
 
-            // 💡 IMPORTANTE: Si usas la fachada 'firebase.auth', asegúrate de que 
-            // el ServiceProvider de Firebase también use las credenciales limpias.
+            // 💡 NOTA: app('firebase.auth') usa la config global. 
+            // Si esto falla, el error está en config/firebase.php
             $auth = app('firebase.auth'); 
             $userRecord = $auth->getUserByPhoneNumber($firebasePhone);
 
@@ -95,9 +110,12 @@ class LoginController extends Controller
         } catch (\Exception $e) {
             Log::error('Login error: ' . $e->getMessage());
 
-            $errorMessage = str_contains($e->getMessage(), 'invalid_grant')
-                ? 'Error de conexión con Google (Credenciales corruptas en Railway). Revisa el formato JSON.'
-                : 'Error al iniciar sesión: ' . $e->getMessage();
+            // Mensaje detallado para saber si es el JSON o algo más
+            $errorMessage = 'Error al iniciar sesión: ' . $e->getMessage();
+            
+            if (str_contains($e->getMessage(), 'invalid_grant') || str_contains($e->getMessage(), 'JSON')) {
+                $errorMessage = 'Error de credenciales (JSON corrupto). Por favor, limpia la variable en Railway.';
+            }
 
             return back()->withErrors([
                 'phone' => $errorMessage
