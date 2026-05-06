@@ -8,20 +8,29 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Session;
-use Google\Cloud\Firestore\FirestoreClient; // Añadimos esto para el parche
+use Google\Cloud\Firestore\FirestoreClient;
 
 class RegisterController extends Controller
 {
     public function showRegistrationForm() { return view('auth.register'); }
 
     /**
-     * Parche para obtener Firestore con transporte REST y limpieza de llave
+     * Parche para obtener Firestore con transporte REST y limpieza profunda de JSON
      */
     private function getFirestore()
     {
-        $json = env('FIREBASE_CREDENTIALS_JSON');
-        $credentials = json_decode($json, true);
+        // 1. Obtenemos el JSON crudo que Railway ensucia
+        $jsonRaw = env('FIREBASE_CREDENTIALS_JSON');
 
+        if (!$jsonRaw) {
+            throw new \Exception('FIREBASE_CREDENTIALS_JSON no configurado en Railway.');
+        }
+
+        // 2. LIMPIEZA MAESTRA: Quitamos barras extra y escapes de comillas (visto en tu Raw Editor)
+        $jsonClean = str_replace(['\\n', '\\"'], ["\n", '"'], $jsonRaw);
+        $credentials = json_decode($jsonClean, true);
+
+        // 3. Verificación y limpieza final de la private_key
         if (isset($credentials['private_key'])) {
             $credentials['private_key'] = str_replace(['\\n', "\n"], "\n", $credentials['private_key']);
         }
@@ -29,7 +38,7 @@ class RegisterController extends Controller
         return new FirestoreClient([
             'projectId' => $credentials['project_id'] ?? 'proyectointegrador-43071',
             'keyFile'   => $credentials,
-            'transport' => 'rest', // 🚀 Crucial para Railway
+            'transport' => 'rest', // 🚀 Vital para evitar caídas en Railway
         ]);
     }
 
@@ -54,7 +63,9 @@ class RegisterController extends Controller
             $cleanPhone = preg_replace('/[^0-9]/', '', $request->phone);
             $firebasePhone = '+52' . ltrim($cleanPhone, '0');
 
-            // 1. Registro en Firebase Auth (usando el helper app() para evitar conflictos)
+            // 1. Registro en Firebase Auth
+            // Nota: Este helper app('firebase.auth') depende de tu ServiceProvider.
+            // Si el login falla, asegúrate de que el ServiceProvider también limpie el JSON.
             $auth = app('firebase.auth');
             $userRecord = $auth->createUser([
                 'phoneNumber' => $firebasePhone,
@@ -89,7 +100,7 @@ class RegisterController extends Controller
 
             // Redirección inteligente
             if ($rolAsignado === 'empresa') {
-                return redirect()->route('vacantes.index')->with('success', '¡Registro de empresa exitoso! Ya puedes gestionar vacantes.');
+                return redirect()->route('vacantes.index')->with('success', '¡Registro de empresa exitoso!');
             }
 
             return redirect()->route('home')->with('success', '¡Registro exitoso!');
@@ -97,10 +108,10 @@ class RegisterController extends Controller
         } catch (\Exception $e) {
             Log::error('Error Firebase Register: ' . $e->getMessage());
             
-            // Si el error contiene "invalid_grant", ya sabemos que es el JSON de Railway
+            // Mensaje amigable para el error de credenciales corruptas
             $msg = str_contains($e->getMessage(), 'invalid_grant') 
-                ? 'Error de credenciales en el servidor. Revisa el JSON de Firebase.' 
-                : 'El número ya está registrado o hubo un error de conexión.';
+                ? 'Error de conexión (Credenciales corruptas en Railway). Intenta de nuevo en unos minutos.' 
+                : 'El número ya está registrado o hubo un error de red.';
 
             return back()->withErrors(['phone' => $msg])->withInput();
         }
