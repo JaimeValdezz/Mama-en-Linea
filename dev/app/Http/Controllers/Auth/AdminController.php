@@ -11,19 +11,32 @@ class AdminController extends Controller
 {
     /**
      * Limpia y obtiene las credenciales de Firebase desde Railway
+     * Soluciona el problema de "escapado" de caracteres detectado en el Raw Editor
      */
     private function getFirebaseDatabase()
     {
-        // Obtenemos el JSON crudo de la variable de entorno
+        // 1. Obtenemos el JSON crudo de la variable de entorno
         $jsonRaw = env('FIREBASE_CREDENTIALS_JSON');
         
-        // Limpiamos basura de escape (diagonales y saltos de línea mal formateados)
+        if (!$jsonRaw) {
+            Log::error("FIREBASE_CREDENTIALS_JSON no configurado en Railway.");
+            throw new \Exception('Configuración de Firebase ausente.');
+        }
+        
+        // 2. Limpieza de basura de escape que Railway añade automáticamente
+        // Convertimos los literal "\n" en saltos reales y eliminamos el escape de comillas
         $jsonClean = str_replace(['\\n', '\\"'], ["\n", '"'], $jsonRaw);
         
-        // Decodificamos a un array
+        // 3. Decodificamos a un array
         $credentials = json_decode($jsonClean, true);
 
-        // Retornamos la base de datos Firestore configurada manualmente
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            Log::error("Error decodificando JSON de Firebase: " . json_last_error_msg());
+            throw new \Exception('JSON de credenciales inválido.');
+        }
+
+        // 4. Retornamos la base de datos Firestore configurada manualmente
+        // Forzamos el uso del array limpio para evitar que use el archivo .json local
         return Firebase::withServiceAccount($credentials)
             ->firestore()
             ->database();
@@ -48,16 +61,17 @@ class AdminController extends Controller
             return view('auth.admin-gestion', compact('vacantes'));
             
         } catch (\Exception $e) {
-            // Este log aparecerá en "View Logs" de Railway si algo falla
+            // Este log aparecerá en "View Logs" de Railway si hay fallos de credenciales
             Log::error("Error en Admin Firestore (Gestion): " . $e->getMessage());
-            return view('auth.admin-gestion', ['vacantes' => collect([])]);
+            return view('auth.admin-gestion', ['vacantes' => collect([])])
+                ->withErrors(['conexion' => 'Error de conexión con la base de datos.']);
         }
     }
 
     public function toggle($id)
     {
         try {
-            // Usamos la conexión limpia también aquí
+            // Usamos la conexión limpia también aquí para asegurar la persistencia
             $database = $this->getFirebaseDatabase();
             $docRef = $database->collection('Vacantes')->document($id);
             $snapshot = $docRef->snapshot();
@@ -70,14 +84,14 @@ class AdminController extends Controller
                     'is_approved' => !$currentStatus
                 ], ['merge' => true]);
 
-                return back()->with('success', 'Estado actualizado correctamente.');
+                return back()->with('success', 'Estado de la vacante actualizado correctamente.');
             }
 
-            return back()->with('error', 'La vacante no existe.');
+            return back()->with('error', 'La vacante seleccionada no existe.');
 
         } catch (\Exception $e) {
             Log::error("Error al actualizar vacante: " . $e->getMessage());
-            return back()->with('error', 'Error al actualizar: ' . $e->getMessage());
+            return back()->with('error', 'No se pudo actualizar la vacante: ' . $e->getMessage());
         }
     }
 }
