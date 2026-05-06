@@ -35,7 +35,7 @@ class LoginController extends Controller
         return new FirestoreClient([
             'projectId' => $credentials['project_id'] ?? 'proyectointegrador-43071',
             'keyFile'   => $credentials,
-            'transport' => 'rest',
+            'transport' => 'grpc',
         ]);
     }
 
