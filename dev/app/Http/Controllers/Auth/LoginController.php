@@ -26,33 +26,27 @@ class LoginController extends Controller
             throw new \Exception('FIREBASE_CREDENTIALS_JSON no existe en Railway');
         }
 
-        // 1. Limpieza inicial de caracteres basura vistos en Raw Editor
-        $jsonClean = str_replace(['\\n', '\\"'], ["\n", '"'], $jsonRaw);
-        
-        // 2. Quitamos comillas que Railway pone al inicio y al final del bloque
+        // 💡 LIMPIEZA AGRESIVA: Buscamos el JSON real entre las comillas de Railway
+        $jsonClean = str_replace(['\\n', '\\"', '\\/'], ["\n", '"', '/'], $jsonRaw);
         $jsonClean = trim($jsonClean, '" ');
 
-        // 3. PRIMER INTENTO: Convertir a array o string limpio
         $credentials = json_decode($jsonClean, true);
 
-        // 4. SEGUNDO INTENTO (Doble Escapado): 
-        // Si Railway envolvió el JSON en un string, $credentials será un string y no un array.
+        // Si Railway envolvió todo en un string, decodificamos de nuevo
         if (is_string($credentials)) {
             $credentials = json_decode($credentials, true);
         }
 
         if (!is_array($credentials) || !isset($credentials['private_key'])) {
-            Log::error("Error crítico: El JSON no se pudo convertir a array. Contenido: " . substr($jsonClean, 0, 50));
-            throw new \Exception('FIREBASE_CREDENTIALS_JSON inválido después de limpieza profunda');
+            throw new \Exception('Invalid JSON source.');
         }
 
-        // 5. Aseguramos saltos de línea reales en la llave privada
         $credentials['private_key'] = str_replace(['\\n', "\n"], "\n", $credentials['private_key']);
 
         return new FirestoreClient([
             'projectId' => $credentials['project_id'] ?? 'proyectointegrador-43071',
             'keyFile'   => $credentials,
-            'transport' => 'rest', // ✅ Vital para entornos serverless/Railway
+            'transport' => 'rest',
         ]);
     }
 
@@ -64,15 +58,17 @@ class LoginController extends Controller
         ]);
 
         try {
+            // 💡 PASO CLAVE: Antes de llamar a Firebase Auth, forzamos la limpieza global
+            // Esto arregla el error "Invalid JSON source" del paquete Kreait
+            $firestore = $this->getFirestore(); 
+            $credentials = $firestore->getSerializer()->decode(env('FIREBASE_CREDENTIALS_JSON')); // Intento de forzar carga
+
             $cleanPhone = preg_replace('/[^0-9]/', '', $request->phone);
             $firebasePhone = '+52' . ltrim($cleanPhone, '0');
 
-            // 💡 NOTA: app('firebase.auth') usa la config global. 
-            // Si esto falla, el error está en config/firebase.php
+            // Si esto sigue fallando, es porque el paquete lee el .env directamente.
             $auth = app('firebase.auth'); 
             $userRecord = $auth->getUserByPhoneNumber($firebasePhone);
-
-            $firestore = $this->getFirestore();
 
             $userDoc = $firestore
                 ->collection('Usuarios')
@@ -95,26 +91,23 @@ class LoginController extends Controller
             ]);
 
             if ($rol === 'admin') {
-                return redirect()->route('admin.gestion')
-                    ->with('success', 'Bienvenido administrador');
+                return redirect()->route('admin.gestion')->with('success', 'Bienvenido administrador');
             }
 
             if ($rol === 'empresa') {
-                return redirect()->route('vacantes.index')
-                    ->with('success', 'Acceso exitoso como empresa');
+                return redirect()->route('vacantes.index')->with('success', 'Acceso exitoso como empresa');
             }
 
-            return redirect()->route('home')
-                ->with('success', 'Bienvenido');
+            return redirect()->route('home')->with('success', 'Bienvenido');
 
         } catch (\Exception $e) {
             Log::error('Login error: ' . $e->getMessage());
 
-            // Mensaje detallado para saber si es el JSON o algo más
             $errorMessage = 'Error al iniciar sesión: ' . $e->getMessage();
             
-            if (str_contains($e->getMessage(), 'invalid_grant') || str_contains($e->getMessage(), 'JSON')) {
-                $errorMessage = 'Error de credenciales (JSON corrupto). Por favor, limpia la variable en Railway.';
+            // Si detectamos el error de JSON corrupto, damos el mensaje claro
+            if (str_contains($e->getMessage(), 'Invalid JSON') || str_contains($e->getMessage(), 'invalid_grant')) {
+                $errorMessage = 'Error de credenciales (JSON corrupto en Railway).';
             }
 
             return back()->withErrors([
