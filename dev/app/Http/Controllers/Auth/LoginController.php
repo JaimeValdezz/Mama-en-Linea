@@ -6,7 +6,8 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Log;
-use Google\Cloud\Firestore\FirestoreClient;
+use Illuminate\Support\Facades\Hash;
+use App\Models\User; // Asegúrate de tener el modelo User creado
 
 class LoginController extends Controller
 {
@@ -15,81 +16,39 @@ class LoginController extends Controller
         return view('auth.login');
     }
 
-    /**
-     * Parche de Doble Decodificación para Railway
-     */
-    private function getFirestore()
-    {
-        $jsonRaw = env('FIREBASE_CREDENTIALS_JSON');
-
-        if (!$jsonRaw) {
-            throw new \Exception('FIREBASE_CREDENTIALS_JSON no existe en Railway');
-        }
-
-        // 💡 LIMPIEZA AGRESIVA: Buscamos el JSON real entre las comillas de Railway
-        $jsonClean = str_replace(['\\n', '\\"', '\\/'], ["\n", '"', '/'], $jsonRaw);
-        $jsonClean = trim($jsonClean, '" ');
-
-        $credentials = json_decode($jsonClean, true);
-
-        // Si Railway envolvió todo en un string, decodificamos de nuevo
-        if (is_string($credentials)) {
-            $credentials = json_decode($credentials, true);
-        }
-
-        if (!is_array($credentials) || !isset($credentials['private_key'])) {
-            throw new \Exception('Invalid JSON source.');
-        }
-
-        $credentials['private_key'] = str_replace(['\\n', "\n"], "\n", $credentials['private_key']);
-
-        return new FirestoreClient([
-            'projectId' => $credentials['project_id'] ?? 'proyectointegrador-43071',
-            'keyFile'   => $credentials,
-            'transport' => 'rest',
-        ]);
-    }
-
     public function login(Request $request)
     {
+        // 1. Validación básica
         $request->validate([
             'phone'    => 'required|string',
             'password' => 'required|string',
         ]);
 
         try {
-            // 💡 PASO CLAVE: Antes de llamar a Firebase Auth, forzamos la limpieza global
-            // Esto arregla el error "Invalid JSON source" del paquete Kreait
-            $firestore = $this->getFirestore(); 
-            $credentials = $firestore->getSerializer()->decode(env('FIREBASE_CREDENTIALS_JSON')); // Intento de forzar carga
-
+            // 2. Limpieza del número de teléfono (quitar espacios, guiones, etc.)
             $cleanPhone = preg_replace('/[^0-9]/', '', $request->phone);
-            $firebasePhone = '+52' . ltrim($cleanPhone, '0');
 
-            // Si esto sigue fallando, es porque el paquete lee el .env directamente.
-            $auth = app('firebase.auth'); 
-            $userRecord = $auth->getUserByPhoneNumber($firebasePhone);
+            // 3. BUSQUEDA EN SQL: Buscamos al usuario en nuestra tabla local
+            // Ya no usamos Firestore, buscamos directamente por el campo 'telefono'
+            $user = User::where('telefono', $cleanPhone)->first();
 
-            $userDoc = $firestore
-                ->collection('Usuarios')
-                ->document($userRecord->uid)
-                ->snapshot();
-
-            if (!$userDoc->exists()) {
+            // 4. Verificación de existencia y contraseña
+            if (!$user || !Hash::check($request->password, $user->password)) {
                 return back()->withErrors([
-                    'phone' => 'El número está registrado pero no tiene perfil en la base de datos.'
+                    'phone' => 'Las credenciales no coinciden con nuestros registros locales.'
                 ]);
             }
 
-            $userData = $userDoc->data();
-            $rol = isset($userData['rol']) ? trim($userData['rol']) : 'usuario';
+            // 5. Guardar sesión (Mantenemos la estructura que ya tenías)
+            $rol = trim($user->rol ?? 'usuario');
 
             Session::put('firebase_user', [
-                'uid'    => $userRecord->uid,
-                'nombre' => $userData['nombre_completo'] ?? 'Usuario',
+                'uid'    => $user->id,
+                'nombre' => $user->nombre_completo ?? 'Usuario',
                 'rol'    => $rol
             ]);
 
+            // 6. Redirección según rol
             if ($rol === 'admin') {
                 return redirect()->route('admin.gestion')->with('success', 'Bienvenido administrador');
             }
@@ -103,15 +62,8 @@ class LoginController extends Controller
         } catch (\Exception $e) {
             Log::error('Login error: ' . $e->getMessage());
 
-            $errorMessage = 'Error al iniciar sesión: ' . $e->getMessage();
-            
-            // Si detectamos el error de JSON corrupto, damos el mensaje claro
-            if (str_contains($e->getMessage(), 'Invalid JSON') || str_contains($e->getMessage(), 'invalid_grant')) {
-                $errorMessage = 'Error de credenciales (JSON corrupto en Railway).';
-            }
-
             return back()->withErrors([
-                'phone' => $errorMessage
+                'phone' => 'Error interno al intentar iniciar sesión. Inténtelo más tarde.'
             ]);
         }
     }
