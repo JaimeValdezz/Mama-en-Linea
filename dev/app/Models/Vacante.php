@@ -10,11 +10,12 @@ class Vacante extends Model
     use HasFactory;
 
     protected $fillable = [
+        'nombre_empresa',
         'titulo',
+        'sueldo',
+        'lugar',
         'descripcion',
-        'empresa',
-        'ubicacion',
-        'salario',
-        'user_id'
+        'contacto',
+        'is_approved'
     ];
 }
