@@ -2,12 +2,19 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Vacante extends Model
 {
-    // Esto permite que el controlador guarde los datos en Postgres
+    use HasFactory;
+
     protected $fillable = [
-        'nombre_empresa', 'titulo', 'sueldo', 'lugar', 'descripcion', 'contacto', 'is_approved'
+        'titulo',
+        'descripcion',
+        'empresa',
+        'ubicacion',
+        'salario',
+        'user_id'
     ];
 }
